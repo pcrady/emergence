@@ -16,7 +16,7 @@ class Particle:
     radius: float = 3.0
     mass: float = 1.0
 
-    def __init__(self, x, y, velocity_x, velocity_y, bounce) -> None:
+    def __init__(self, x: float, y: float, velocity_x: float, velocity_y: float, bounce: bool = True, draw_force_vector: bool = True) -> None:
         self.position_x: float = x
         self.position_y: float = y
 
@@ -25,12 +25,15 @@ class Particle:
 
         self.color: str = self.__random_color()
         self.bounce: bool = bounce
+        self.draw_force_vector: bool = draw_force_vector
 
         self.position_x_left_edge: float = self.position_x - Particle.radius
         self.position_x_right_edge: float = self.position_x + Particle.radius
 
         self.position_y_top_edge: float = self.position_y + Particle.radius
         self.position_y_bottom_edge: float = self.position_y - Particle.radius
+
+        self.force_vector: tuple[float, float] = (0, 0)
 
     @staticmethod
     def __random_color() -> str:
@@ -46,7 +49,13 @@ class Particle:
         print("{}Velocity: ({},{})".format(label, truncate(self.velocity_x), truncate(self.velocity_y)))
 
     def draw(self, screen) -> None:
-        pygame.draw.circle(screen, self.color, (int(self.position_x), int(self.position_y)), Particle.radius)
+        pygame.draw.circle(screen, self.color, (self.position_x, self.position_y), Particle.radius)
+
+        if self.draw_force_vector:
+            start_position = (self.position_x, self.position_y)
+            end_position = tuple(map(sum, zip(start_position, self.force_vector)))
+            pygame.draw.line(screen, self.color, start_position, end_position)
+            
 
     def calculate_position(self, time_delta, screen) -> None:
         epsilon = 1
@@ -94,9 +103,9 @@ class Particle:
             
 
     def calculate_velocity(self, time_delta, other_particle) -> None:
-        force = self.calculate_force(other_particle)
-        velocity_x = self.velocity_x + force[0] * time_delta 
-        velocity_y = self.velocity_y + force[1] * time_delta
+        self.calculate_force(other_particle)
+        velocity_x = self.velocity_x + self.force_vector[0] * time_delta 
+        velocity_y = self.velocity_y + self.force_vector[1] * time_delta
 
         if velocity_x >= 0:
             self.velocity_x = velocity_x if velocity_x <= 500.0 else 500.0
@@ -109,14 +118,12 @@ class Particle:
             self.velocity_y = velocity_y if velocity_y >= -500.0 else -500.0
  
 
-    def calculate_force(self, other_particle) -> tuple[float, float]:
-        numerator = 10000000.0 if self.color == other_particle.color else -1000000.0
+    def calculate_force(self, other_particle) -> None:
+        numerator = 10000000.0 if self.color == other_particle.color else -10000000.0
 
         total_distance = (self.position_x - other_particle.position_x) ** 2 + (self.position_y - other_particle.position_y) ** 2
-        if total_distance > Particle.radius * 100:
-            return (0, 0)
 
-        total_distance = total_distance if total_distance != 0 else 0.001
+        total_distance = total_distance if total_distance >= 0.0001 else 0.0001
         force_magnitude = numerator / total_distance
 
         delta_y = self.position_y - other_particle.position_y
@@ -132,7 +139,7 @@ class Particle:
         if self.position_y < other_particle.position_y:
             force_y *= -1
 
-        return (force_x, force_y)
+        self.force_vector = (force_x, force_y)
 
 
 class Screen:
@@ -155,7 +162,7 @@ class Screen:
 
 screen = Screen()    
 
-num_particles = 100
+num_particles = 2
 
 particles = [Particle(random.uniform(50, 950),
                       random.uniform(50, 950),
@@ -163,6 +170,7 @@ particles = [Particle(random.uniform(50, 950),
                       random.uniform(-100, 100),
                       True) for _ in range(num_particles)]
 
+particles = [Particle(500, 100, 100, 100, True), Particle(500, 900, -100, -90, True)]
 #particles = [Particle(200, 100, 0, 0), Particle(600, 500, 0, 0)]
 # Main simulation loop
 running = True
