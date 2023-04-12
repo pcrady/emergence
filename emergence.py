@@ -39,33 +39,8 @@ class Particle:
     def __random_color() -> str:
         return random.choice(list(Color.__members__))
 
-    def truncate(self, value: float) -> float:
-        return float('%.3f'%(value))
-
-    def print_position(self, label = "") -> None:
-        print("{}Position: ({},{})".format(label, truncate(self.position_x), truncate(self.position_y)))
-
-    def print_velocity(self, label = "") -> None:
-        print("{}Velocity: ({},{})".format(label, truncate(self.velocity_x), truncate(self.velocity_y)))
-
-    def draw(self, screen) -> None:
-        pygame.draw.circle(screen, self.color, (self.position_x, self.position_y), Particle.radius)
-
-        if self.draw_force_vector:
-            particle_position = (self.position_x, self.position_y)
-            
-            end_position_force = tuple(map(sum, zip(particle_position, self.force_vector)))
-            pygame.draw.line(screen, self.color, particle_position, end_position_force)
-
-            #end_position_velocity = tuple(map(sum, zip(particle_position, (self.velocity_x, self.velocity_y))))
-            #pygame.draw.line(screen, self.color, particle_position, end_position_velocity)
-            
-
-    def calculate_position(self, time_delta, screen) -> None:
+    def __handle_walls(self, position_x: float, position_y: float, screen) -> None:
         epsilon = 1
-        position_x = self.position_x + self.velocity_x * time_delta
-        position_y = self.position_y + self.velocity_y * time_delta
-
         if not self.bounce:
             # calculate the x position withOUT bouncing
             if position_x < 0:
@@ -104,13 +79,8 @@ class Particle:
                 self.velocity_y *= -1.0
             else:
                 self.position_y = position_y
-            
 
-    def calculate_velocity(self, time_delta, other_particle) -> None:
-        self.calculate_force(other_particle)
-        velocity_x = self.velocity_x + self.force_vector[0] * time_delta 
-        velocity_y = self.velocity_y + self.force_vector[1] * time_delta
-
+    def __handle_max_velocity(self, velocity_x: float, velocity_y: float) -> None:
         if velocity_x >= 0:
             self.velocity_x = velocity_x if velocity_x <= 500.0 else 500.0
         else:
@@ -120,6 +90,34 @@ class Particle:
             self.velocity_y = velocity_y if velocity_y <= 500.0 else 500.0
         else: 
             self.velocity_y = velocity_y if velocity_y >= -500.0 else -500.0
+ 
+    def truncate(self, value: float) -> float:
+        return float('%.3f'%(value))
+
+    def print_position(self, label = "") -> None:
+        print("{}Position: ({},{})".format(label, truncate(self.position_x), truncate(self.position_y)))
+
+    def print_velocity(self, label = "") -> None:
+        print("{}Velocity: ({},{})".format(label, truncate(self.velocity_x), truncate(self.velocity_y)))
+
+    def draw(self, screen) -> None:
+        pygame.draw.circle(screen, self.color, (self.position_x, self.position_y), Particle.radius)
+
+        if self.draw_force_vector:
+            particle_position = (self.position_x, self.position_y)
+            end_position_force = tuple(map(sum, zip(particle_position, self.force_vector)))
+            pygame.draw.line(screen, self.color, particle_position, end_position_force)
+
+    def calculate_position(self, time_delta, screen) -> None:
+        position_x = self.position_x + self.velocity_x * time_delta
+        position_y = self.position_y + self.velocity_y * time_delta
+        self.__handle_walls(position_x, position_y, screen)
+
+    def calculate_velocity(self, time_delta, other_particle) -> None:
+        self.calculate_force(other_particle)
+        velocity_x = self.velocity_x + self.force_vector[0] * time_delta 
+        velocity_y = self.velocity_y + self.force_vector[1] * time_delta
+        self.__handle_max_velocity(velocity_x, velocity_y)
 
     def calculate_force(self, other_particle) -> None:
         force_constant = -1000000.0
