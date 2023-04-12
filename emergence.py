@@ -52,9 +52,13 @@ class Particle:
         pygame.draw.circle(screen, self.color, (self.position_x, self.position_y), Particle.radius)
 
         if self.draw_force_vector:
-            start_position = (self.position_x, self.position_y)
-            end_position = tuple(map(sum, zip(start_position, self.force_vector)))
-            pygame.draw.line(screen, self.color, start_position, end_position)
+            particle_position = (self.position_x, self.position_y)
+            
+            end_position_force = tuple(map(sum, zip(particle_position, self.force_vector)))
+            pygame.draw.line(screen, self.color, particle_position, end_position_force)
+
+            #end_position_velocity = tuple(map(sum, zip(particle_position, (self.velocity_x, self.velocity_y))))
+            #pygame.draw.line(screen, self.color, particle_position, end_position_velocity)
             
 
     def calculate_position(self, time_delta, screen) -> None:
@@ -116,29 +120,18 @@ class Particle:
             self.velocity_y = velocity_y if velocity_y <= 500.0 else 500.0
         else: 
             self.velocity_y = velocity_y if velocity_y >= -500.0 else -500.0
- 
 
     def calculate_force(self, other_particle) -> None:
-        numerator = 10000000.0 if self.color == other_particle.color else -10000000.0
+        force_constant = -1000000.0
 
-        total_distance = (self.position_x - other_particle.position_x) ** 2 + (self.position_y - other_particle.position_y) ** 2
-
-        total_distance = total_distance if total_distance >= 0.0001 else 0.0001
-        force_magnitude = numerator / total_distance
-
+        delta_x = self.position_x - other_particle.position_x
         delta_y = self.position_y - other_particle.position_y
-        delta_x = self.position_x - other_particle.position_x if self.position_x != other_particle.position_x else 0.0001
 
-        angle = math.atan(delta_y / delta_x)
+        magnitude = ((delta_x)**2 + (delta_y)**2)**0.5
+        unit_vector = (delta_x / magnitude, delta_y / magnitude)
 
-        force_x = math.cos(angle) * force_magnitude
-        force_y = math.sin(angle) * force_magnitude
-
-        if self.position_x < other_particle.position_x:
-            force_x *= -1
-        if self.position_y < other_particle.position_y:
-            force_y *= -1
-
+        force_x = (force_constant / magnitude ** 2) * unit_vector[0]
+        force_y = (force_constant / magnitude ** 2) * unit_vector[1]
         self.force_vector = (force_x, force_y)
 
 
@@ -162,17 +155,26 @@ class Screen:
 
 screen = Screen()    
 
-num_particles = 2
+num_particles = 3
 
-particles = [Particle(random.uniform(50, 950),
-                      random.uniform(50, 950),
-                      random.uniform(-100, 100),
-                      random.uniform(-100, 100),
-                      True) for _ in range(num_particles)]
+#particles = [Particle(random.uniform(50, 950),
+#                      random.uniform(50, 950),
+#                      random.uniform(-100, 100),
+#                      random.uniform(-100, 100),
+#                      True) for _ in range(num_particles)]
 
-particles = [Particle(500, 100, 100, 100, True), Particle(500, 900, -100, -90, True)]
-#particles = [Particle(200, 100, 0, 0), Particle(600, 500, 0, 0)]
-# Main simulation loop
+particles = [
+        #Particle(400, 400, 0, 0, True),
+        #Particle(500, 900, 0, 0, True),
+        #Particle(600, 600, 0, 0, True),
+
+        Particle(400, 600, 0, 0, True),
+        Particle(500, 900, 0, 0, True),
+        Particle(600, 400, 0, 0, True),
+
+
+        ]
+
 running = True
 while running:
     screen.fill()
