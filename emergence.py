@@ -13,17 +13,18 @@ class Color(Enum):
 
 # Define Particle class
 class Particle:
-    radius: float = 10.0
+    radius: float = 3.0
     mass: float = 1.0
 
-    def __init__(self, x, y, velocity_x, velocity_y) -> None:
+    def __init__(self, x, y, velocity_x, velocity_y, bounce) -> None:
         self.position_x: float = x
         self.position_y: float = y
 
         self.velocity_x: float = velocity_x
         self.velocity_y: float = velocity_y
 
-        self.color: str = self.random_color()
+        self.color: str = self.__random_color()
+        self.bounce: bool = bounce
 
         self.position_x_left_edge: float = self.position_x - Particle.radius
         self.position_x_right_edge: float = self.position_x + Particle.radius
@@ -32,15 +33,14 @@ class Particle:
         self.position_y_bottom_edge: float = self.position_y - Particle.radius
 
     @staticmethod
-    def random_color() -> str:
+    def __random_color() -> str:
         return random.choice(list(Color.__members__))
 
     def truncate(self, value: float) -> float:
         return float('%.3f'%(value))
 
     def print_position(self, label = "") -> None:
-        if self.position_x < 0 or self.position_y < 0:
-            print("{}Position: ({},{})".format(label, truncate(self.position_x), truncate(self.position_y)))
+        print("{}Position: ({},{})".format(label, truncate(self.position_x), truncate(self.position_y)))
 
     def print_velocity(self, label = "") -> None:
         print("{}Velocity: ({},{})".format(label, truncate(self.velocity_x), truncate(self.velocity_y)))
@@ -49,18 +49,49 @@ class Particle:
         pygame.draw.circle(screen, self.color, (int(self.position_x), int(self.position_y)), Particle.radius)
 
     def calculate_position(self, time_delta, screen) -> None:
-        epsilon = 1.0
-        if (self.position_x < 0 + epsilon):
-            self.position_x = screen.x_screen - epsilon
-        if (self.position_x > screen.x_screen - epsilon):
-            self.position_x = 0 + epsilon
-        if (self.position_y < 0 + epsilon):
-            self.position_y = screen.y_screen - epsilon
-        if (self.position_y > screen.y_screen - epsilon):
-            self.position_y = 0 + epsilon
+        epsilon = 1
+        position_x = self.position_x + self.velocity_x * time_delta
+        position_y = self.position_y + self.velocity_y * time_delta
+
+        if not self.bounce:
+            # calculate the x position withOUT bouncing
+            if position_x < 0:
+                self.position_x = screen.x_screen - epsilon
+            elif position_x > screen.x_screen:
+                self.position_x = 0 + epsilon
+            else:
+                self.position_x = position_x
+
+            # calculate the y position withOUT bouncing
+            if position_y < 0:
+                self.position_y = screen.y_screen - epsilon
+            elif position_y > screen.y_screen:
+                self.position_y = 0 + epsilon
+            else:
+                self.position_y = position_y
         else:
-            self.position_x += self.velocity_x * time_delta
-            self.position_y += self.velocity_y * time_delta
+            # calculate the x position WITH bounching
+            # inverts velocity_x if necessary
+            if position_x < 0:
+                self.position_x = 0 + epsilon
+                self.velocity_x *= -1.0
+            elif position_x > screen.x_screen:
+                self.position_x = screen.x_screen - epsilon
+                self.velocity_x *= -1.0
+            else:
+                self.position_x = position_x
+
+            # calculate the y position WITH bouncing
+            # inverts velocity_y if necessary
+            if position_y < 0:
+                self.position_y = 0 + epsilon
+                self.velocity_y *= -1.0
+            elif position_y > screen.y_screen:
+                self.position_y = screen.y_screen - epsilon
+                self.velocity_y *= -1.0
+            else:
+                self.position_y = position_y
+            
 
     def calculate_velocity(self, time_delta, other_particle) -> None:
         force = self.calculate_force(other_particle)
@@ -82,6 +113,9 @@ class Particle:
         numerator = 10000000.0 if self.color == other_particle.color else -1000000.0
 
         total_distance = (self.position_x - other_particle.position_x) ** 2 + (self.position_y - other_particle.position_y) ** 2
+        if total_distance > Particle.radius * 100:
+            return (0, 0)
+
         total_distance = total_distance if total_distance != 0 else 0.001
         force_magnitude = numerator / total_distance
 
@@ -111,9 +145,8 @@ class Screen:
         pygame.display.set_caption("Emergent Phenomena Simulation")
         self.clock = pygame.time.Clock()
 
-
     def fill(self) -> None:
-        self.screen.fill((255, 255, 255))
+        self.screen.fill((0, 0, 0))
 
     def get_time(self) -> int:
         return self.clock.get_time()
@@ -127,7 +160,8 @@ num_particles = 100
 particles = [Particle(random.uniform(50, 950),
                       random.uniform(50, 950),
                       random.uniform(-100, 100),
-                      random.uniform(-100, 100)) for _ in range(num_particles)]
+                      random.uniform(-100, 100),
+                      True) for _ in range(num_particles)]
 
 #particles = [Particle(200, 100, 0, 0), Particle(600, 500, 0, 0)]
 # Main simulation loop
@@ -139,8 +173,6 @@ while running:
 
     # Draw and update particle positions
     for i in range(num_particles):
-        particles[i].print_position()
-
         for j in range(i + 1, num_particles):
             particles[i].calculate_velocity(time_delta, particles[j])
             particles[j].calculate_velocity(time_delta, particles[i])
