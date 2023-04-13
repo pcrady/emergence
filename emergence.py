@@ -131,7 +131,7 @@ class Particle:
         velocity_y = self.velocity_y + self.force_vector[1] * time_delta
         self.__handle_max_velocity(velocity_x, velocity_y)
 
-    def calculate_force(self, other_particle: 'Particle') -> None:
+    def calculate_force(self, other_particle: 'Particle') -> tuple[float, float]:
         force_constant = -1000000.0
 
         delta_x = self.position_x - other_particle.position_x
@@ -142,11 +142,20 @@ class Particle:
 
         force_x = (force_constant / magnitude ** 2) * unit_vector[0]
         force_y = (force_constant / magnitude ** 2) * unit_vector[1]
-        self.force_vector = (force_x, force_y)
+        return (force_x, force_y)
 
     def calculate_total_force(self, particles: list['Particle']) -> None:
-        pass
-        
+        sum_force_x = self.force_vector[0]
+        sum_force_y = self.force_vector[1]
+
+        for particle in particles:
+            force = self.calculate_force(particle)
+            sum_force_x += force[0]
+            sum_force_y += force[1]
+
+        self.force_vector = (sum_force_x, sum_force_y)
+            
+    
        
 
 screen = Screen()    
@@ -167,8 +176,6 @@ particles = [
         Particle(400, 600, 0, 0, True),
         Particle(500, 900, 0, 0, True),
         Particle(600, 400, 0, 0, True),
-
-
         ]
 
 running = True
