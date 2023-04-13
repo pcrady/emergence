@@ -1,15 +1,27 @@
 import pygame
 import random
-import math
 from enum import Enum
-
-def truncate(value: float) -> float:
-    return float('%.3f'%(value))
 
 class Color(Enum):
     red = (255, 0, 0)
     green = (0, 255, 0)
     blue = (0, 0, 255)
+
+class Screen:
+    x_screen: float = 1000
+    y_screen: float = 1000
+
+    def __init__(self) -> None:
+        pygame.init()
+        self.screen = pygame.display.set_mode((Screen.x_screen, Screen.y_screen))
+        pygame.display.set_caption("Emergent Phenomena Simulation")
+        self.clock = pygame.time.Clock()
+
+    def fill(self) -> None:
+        self.screen.fill((0, 0, 0))
+
+    def get_time(self) -> int:
+        return self.clock.get_time()
 
 # Define Particle class
 class Particle:
@@ -39,7 +51,7 @@ class Particle:
     def __random_color() -> str:
         return random.choice(list(Color.__members__))
 
-    def __handle_walls(self, position_x: float, position_y: float, screen) -> None:
+    def __handle_walls(self, position_x: float, position_y: float, screen: 'Screen') -> None:
         epsilon = 1
         if not self.bounce:
             # calculate the x position withOUT bouncing
@@ -91,35 +103,35 @@ class Particle:
         else: 
             self.velocity_y = velocity_y if velocity_y >= -500.0 else -500.0
  
-    def truncate(self, value: float) -> float:
+    def __truncate(self, value: float) -> float:
         return float('%.3f'%(value))
 
     def print_position(self, label = "") -> None:
-        print("{}Position: ({},{})".format(label, truncate(self.position_x), truncate(self.position_y)))
+        print("{}Position: ({},{})".format(label, self.__truncate(self.position_x), self.__truncate(self.position_y)))
 
     def print_velocity(self, label = "") -> None:
-        print("{}Velocity: ({},{})".format(label, truncate(self.velocity_x), truncate(self.velocity_y)))
+        print("{}Velocity: ({},{})".format(label, self.__truncate(self.velocity_x), self.__truncate(self.velocity_y)))
 
-    def draw(self, screen) -> None:
-        pygame.draw.circle(screen, self.color, (self.position_x, self.position_y), Particle.radius)
+    def draw(self, screen: 'Screen') -> None:
+        pygame.draw.circle(screen.screen, self.color, (self.position_x, self.position_y), Particle.radius)
 
         if self.draw_force_vector:
             particle_position = (self.position_x, self.position_y)
             end_position_force = tuple(map(sum, zip(particle_position, self.force_vector)))
-            pygame.draw.line(screen, self.color, particle_position, end_position_force)
+            pygame.draw.line(screen.screen, self.color, particle_position, end_position_force)
 
-    def calculate_position(self, time_delta, screen) -> None:
+    def calculate_position(self, time_delta: float, screen: 'Screen') -> None:
         position_x = self.position_x + self.velocity_x * time_delta
         position_y = self.position_y + self.velocity_y * time_delta
         self.__handle_walls(position_x, position_y, screen)
 
-    def calculate_velocity(self, time_delta, other_particle) -> None:
+    def calculate_velocity(self, time_delta: float, other_particle: 'Particle') -> None:
         self.calculate_force(other_particle)
         velocity_x = self.velocity_x + self.force_vector[0] * time_delta 
         velocity_y = self.velocity_y + self.force_vector[1] * time_delta
         self.__handle_max_velocity(velocity_x, velocity_y)
 
-    def calculate_force(self, other_particle) -> None:
+    def calculate_force(self, other_particle: 'Particle') -> None:
         force_constant = -1000000.0
 
         delta_x = self.position_x - other_particle.position_x
@@ -132,23 +144,9 @@ class Particle:
         force_y = (force_constant / magnitude ** 2) * unit_vector[1]
         self.force_vector = (force_x, force_y)
 
-
-class Screen:
-    x_screen: float = 1000
-    y_screen: float = 1000
-
-    def __init__(self) -> None:
-        pygame.init()
-        self.screen = pygame.display.set_mode((Screen.x_screen, Screen.y_screen))
-        pygame.display.set_caption("Emergent Phenomena Simulation")
-        self.clock = pygame.time.Clock()
-
-    def fill(self) -> None:
-        self.screen.fill((0, 0, 0))
-
-    def get_time(self) -> int:
-        return self.clock.get_time()
-
+    def calculate_total_force(self, particles: list['Particle']) -> None:
+        pass
+        
        
 
 screen = Screen()    
@@ -187,7 +185,7 @@ while running:
             
     for p in particles:
         p.calculate_position(time_delta, screen)
-        p.draw(screen.screen)
+        p.draw(screen)
 
 
 
