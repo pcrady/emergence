@@ -1,21 +1,25 @@
 import pygame
 import random
 from enum import Enum
+import numpy as np
+
 
 class Color(Enum):
     red = (255, 0, 0)
     green = (0, 255, 0)
     blue = (0, 0, 255)
 
+
 class Screen:
-    x_screen: float = 1000
-    y_screen: float = 1000
+    screen_min: np.ndarray = np.array([0.0, 0.0])
+    screen_max: np.ndarray = np.array([1000.0, 1000.0])
 
     def __init__(self) -> None:
         pygame.init()
-        self.screen = pygame.display.set_mode((Screen.x_screen, Screen.y_screen))
+        self.screen = pygame.display.set_mode((Screen.screen_max[0], Screen.screen_max[1]))
         pygame.display.set_caption("Emergent Phenomena Simulation")
         self.clock = pygame.time.Clock()
+        self.font = pygame.font.SysFont("Arial", 18)
 
     def fill(self) -> None:
         self.screen.fill((0, 0, 0))
@@ -23,186 +27,137 @@ class Screen:
     def get_time(self) -> int:
         return self.clock.get_time()
 
-# Define Particle class
+    def update_fps(self):
+        fps = str(int(self.clock.get_fps()))
+        fps_text = self.font.render(fps, False, pygame.Color("white"))
+        return fps_text
+
+
 class Particle:
-    radius: float = 3.0
+    radius: float = 5.0
     mass: float = 1.0
+    max_velocity: float = 1000.0
+    epsilon: float = 1e-9
 
-    def __init__(self, x: float, y: float, velocity_x: float, velocity_y: float, bounce: bool = True, draw_force_vector: bool = True) -> None:
-        self.position_x: float = x
-        self.position_y: float = y
+    def __init__(
+            self,
+            position_vector: np.ndarray,
+            velocity_vector: np.ndarray,
+            draw_force_vector: bool = True,
+            label: str = "") -> None:
 
-        self.velocity_x: float = velocity_x
-        self.velocity_y: float = velocity_y
+        self.position_vector: np.ndarray = position_vector
+        self.velocity_vector: np.ndarray = velocity_vector
+        self.force_vector: np.ndarray = np.array([0, 0])
 
         self.color: str = self.__random_color()
-        self.bounce: bool = bounce
         self.draw_force_vector: bool = draw_force_vector
-
-        self.position_x_left_edge: float = self.position_x - Particle.radius
-        self.position_x_right_edge: float = self.position_x + Particle.radius
-
-        self.position_y_top_edge: float = self.position_y + Particle.radius
-        self.position_y_bottom_edge: float = self.position_y - Particle.radius
-
-        self.force_vector: tuple[float, float] = (0, 0)
+        self.label = label
 
     @staticmethod
     def __random_color() -> str:
         return random.choice(list(Color.__members__))
 
-    def __handle_walls(self, position_x: float, position_y: float, screen: 'Screen') -> None:
-        epsilon = 1
-        if not self.bounce:
-            # calculate the x position withOUT bouncing
-            if position_x < 0:
-                self.position_x = screen.x_screen - epsilon
-            elif position_x > screen.x_screen:
-                self.position_x = 0 + epsilon
+    @staticmethod
+    def __magnitude(vector: np.ndarray) -> float:
+        r = sum(i ** 2 for i in vector) ** 0.5
+        return r if r >= Particle.epsilon else Particle.epsilon
+
+    @property
+    def __unit_velocity_vector(self) -> np.ndarray:
+        return self.velocity_vector / self.__magnitude(self.velocity_vector)
+
+    def __handle_walls(self, position: np.ndarray, screen: 'Screen') -> None:
+        for i in range(len(position)):
+            if position[i] < 0:
+                self.position_vector[i] = 0 + Particle.epsilon
+                self.velocity_vector[i] *= -1.0
+            elif position[i] > screen.screen_max[i]:
+                self.position_vector[i] = screen.screen_max[i] - Particle.epsilon
+                self.velocity_vector[i] *= -1.0
             else:
-                self.position_x = position_x
+                self.position_vector[i] = position[i]
 
-            # calculate the y position withOUT bouncing
-            if position_y < 0:
-                self.position_y = screen.y_screen - epsilon
-            elif position_y > screen.y_screen:
-                self.position_y = 0 + epsilon
-            else:
-                self.position_y = position_y
-        else:
-            # calculate the x position WITH bounching
-            # inverts velocity_x if necessary
-            if position_x < 0:
-                self.position_x = 0 + epsilon
-                self.velocity_x *= -1.0
-            elif position_x > screen.x_screen:
-                self.position_x = screen.x_screen - epsilon
-                self.velocity_x *= -1.0
-            else:
-                self.position_x = position_x
+    def __handle_max_velocity(self, velocity: np.ndarray) -> None:
+        velocity_tmp = velocity
 
-            # calculate the y position WITH bouncing
-            # inverts velocity_y if necessary
-            if position_y < 0:
-                self.position_y = 0 + epsilon
-                self.velocity_y *= -1.0
-            elif position_y > screen.y_screen:
-                self.position_y = screen.y_screen - epsilon
-                self.velocity_y *= -1.0
-            else:
-                self.position_y = position_y
+        for i in range(len(velocity)):
+            if velocity[i] >= Particle.max_velocity:
+                velocity_tmp[i] = Particle.max_velocity
+            elif velocity[i] <= -Particle.max_velocity:
+                velocity_tmp[i] = -Particle.max_velocity
 
-    def __handle_max_velocity(self, velocity_x: float, velocity_y: float) -> None:
-        if velocity_x >= 0:
-            self.velocity_x = velocity_x if velocity_x <= 500.0 else 500.0
-        else:
-            self.velocity_x = velocity_x if velocity_x >= -500.0 else -500.0
- 
-        if velocity_y >= 0:
-            self.velocity_y = velocity_y if velocity_y <= 500.0 else 500.0
-        else: 
-            self.velocity_y = velocity_y if velocity_y >= -500.0 else -500.0
- 
-    def __truncate(self, value: float) -> float:
-        return float('%.3f'%(value))
-
-    def print_position(self, label = "") -> None:
-        print("{}Position: ({},{})".format(label, self.__truncate(self.position_x), self.__truncate(self.position_y)))
-
-    def print_velocity(self, label = "") -> None:
-        print("{}Velocity: ({},{})".format(label, self.__truncate(self.velocity_x), self.__truncate(self.velocity_y)))
+        self.velocity_vector = velocity_tmp
 
     def draw(self, screen: 'Screen') -> None:
-        pygame.draw.circle(screen.screen, self.color, (self.position_x, self.position_y), Particle.radius)
-
+        position_tuple = (self.position_vector[0], self.position_vector[1])
+        pygame.draw.circle(screen.screen, self.color, position_tuple, Particle.radius)
+ 
         if self.draw_force_vector:
-            particle_position = (self.position_x, self.position_y)
-            end_position_force = tuple(map(sum, zip(particle_position, self.force_vector)))
-            pygame.draw.line(screen.screen, self.color, particle_position, end_position_force)
+            ndarray_end_position = self.position_vector + self.force_vector
+            end_position = (ndarray_end_position[0], ndarray_end_position[1])
+            pygame.draw.line(screen.screen, self.color, position_tuple, end_position)
 
-    def calculate_position(self, time_delta: float, screen: 'Screen') -> None:
-        position_x = self.position_x + self.velocity_x * time_delta
-        position_y = self.position_y + self.velocity_y * time_delta
-        self.__handle_walls(position_x, position_y, screen)
+    def calculate_position(
+            self,
+            time_delta: float,
+            screen: 'Screen',
+            particles: list['Particle'],
+            ) -> None:
 
-    def calculate_velocity(self, time_delta: float, other_particle: 'Particle') -> None:
-        self.calculate_force(other_particle)
-        velocity_x = self.velocity_x + self.force_vector[0] * time_delta 
-        velocity_y = self.velocity_y + self.force_vector[1] * time_delta
-        self.__handle_max_velocity(velocity_x, velocity_y)
+        self.__calculate_velocity(time_delta, particles)
+        position = self.position_vector + self.velocity_vector * time_delta
+        self.__handle_walls(position, screen)
 
-    def calculate_force(self, other_particle: 'Particle') -> tuple[float, float]:
-        force_constant = -1000000.0
-
-        delta_x = self.position_x - other_particle.position_x
-        delta_y = self.position_y - other_particle.position_y
-
-        magnitude = ((delta_x)**2 + (delta_y)**2)**0.5
-        unit_vector = (delta_x / magnitude, delta_y / magnitude)
-
-        force_x = (force_constant / magnitude ** 2) * unit_vector[0]
-        force_y = (force_constant / magnitude ** 2) * unit_vector[1]
-        return (force_x, force_y)
-
-    def calculate_total_force(self, particles: list['Particle']) -> None:
-        sum_force_x = self.force_vector[0]
-        sum_force_y = self.force_vector[1]
-
+    def __calculate_velocity(self, time_delta: float, particles: list['Particle']) -> None:
+        self.__calculate_total_force(particles)
+        velocity = self.velocity_vector + self.force_vector * time_delta
+        self.__handle_max_velocity(velocity)
+ 
+    def __calculate_total_force(self, particles: list['Particle']) -> None:
+        force = np.array([0, 0])
         for particle in particles:
-            force = self.calculate_force(particle)
-            sum_force_x += force[0]
-            sum_force_y += force[1]
-
-        self.force_vector = (sum_force_x, sum_force_y)
+            force = force + self.__calculate_force(particle)
+        self.force_vector = force
             
-    
-       
+    def __calculate_force(self, other_particle: 'Particle') -> np.ndarray:
+        force_constant = -1000000.0
+        position_delta = self.position_vector - other_particle.position_vector
 
-screen = Screen()    
+        r = self.__magnitude(position_delta)
+        unit_vector = np.array([position_delta[0] / r, position_delta[1] / r])
+        return unit_vector * (force_constant / r**2)
 
-num_particles = 3
 
-#particles = [Particle(random.uniform(50, 950),
-#                      random.uniform(50, 950),
-#                      random.uniform(-100, 100),
-#                      random.uniform(-100, 100),
-#                      True) for _ in range(num_particles)]
+def main():
+    screen = Screen()    
 
-particles = [
-        #Particle(400, 400, 0, 0, True),
-        #Particle(500, 900, 0, 0, True),
-        #Particle(600, 600, 0, 0, True),
-
-        Particle(400, 600, 0, 0, True),
-        Particle(500, 900, 0, 0, True),
-        Particle(600, 400, 0, 0, True),
+    particles = [
+        Particle(np.array([400.0, 400.0]), np.array([0.0, 0.0]), True, "Upper"),
+        Particle(np.array([600.0, 400.0]), np.array([0.0, 0.0]), True, "Lower"),
         ]
 
-running = True
-while running:
-    screen.fill()
+    running = True
+    while running:
+        screen.fill()
+        screen.screen.blit(screen.update_fps(), (10,0))
 
-    time_delta = screen.get_time() / 1000
+        time_delta = screen.get_time() / 1000
 
-    # Draw and update particle positions
-    for i in range(num_particles):
-        for j in range(i + 1, num_particles):
-            particles[i].calculate_velocity(time_delta, particles[j])
-            particles[j].calculate_velocity(time_delta, particles[i])
-            
-    for p in particles:
-        p.calculate_position(time_delta, screen)
-        p.draw(screen)
+        for i in range(len(particles)):
+            sublist = particles[:i] + particles[i + 1:]
+            particles[i].calculate_position(time_delta, screen, sublist)
+            particles[i].draw(screen)
 
+        pygame.display.flip()
+        screen.clock.tick(60)
 
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
 
-    pygame.display.flip()
-    screen.clock.tick(60)
+    pygame.quit()
 
-    # Check for exit event
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-
-pygame.quit()
+if __name__ == "__main__":
+    main()
 
