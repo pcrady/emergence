@@ -10,19 +10,24 @@ class Color(Enum):
     blue = (0, 0, 255)
 
 
+class NumericalMethod(Enum):
+    euloer = 1
+    leapfrog = 2
+
+
 class Screen:
     screen_min: np.ndarray = np.array([0.0, 0.0])
     screen_max: np.ndarray = np.array([1000.0, 1000.0])
 
     def __init__(self) -> None:
         pygame.init()
-        self.screen = pygame.display.set_mode((Screen.screen_max[0], Screen.screen_max[1]))
+        self.surface = pygame.display.set_mode((Screen.screen_max[0], Screen.screen_max[1]))
         pygame.display.set_caption("Emergent Phenomena Simulation")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("Arial", 18)
 
     def fill(self) -> None:
-        self.screen.fill((0, 0, 0))
+        self.surface.fill((0, 0, 0))
 
     def get_time(self) -> int:
         return self.clock.get_time()
@@ -41,18 +46,23 @@ class Particle:
 
     def __init__(
             self,
+            screen: Screen,
             position_vector: np.ndarray,
             velocity_vector: np.ndarray,
+            time_delta: float,
             draw_force_vector: bool = True,
-            label: str = "") -> None:
+            label: str = "",
+        ) -> None:
 
         self.position_vector: np.ndarray = position_vector
         self.velocity_vector: np.ndarray = velocity_vector
         self.force_vector: np.ndarray = np.array([0, 0])
+        self.time_delta: float = time_delta
+        self.screen: Screen = screen
 
         self.color: str = self.__random_color()
         self.draw_force_vector: bool = draw_force_vector
-        self.label = label
+        self.label: str = label
 
     @staticmethod
     def __random_color() -> str:
@@ -63,56 +73,52 @@ class Particle:
         r = sum(i ** 2 for i in vector) ** 0.5
         return r if r >= Particle.epsilon else Particle.epsilon
 
-    @property
-    def __unit_velocity_vector(self) -> np.ndarray:
-        return self.velocity_vector / self.__magnitude(self.velocity_vector)
-
-    def __handle_walls(self, position: np.ndarray, screen: 'Screen') -> None:
-        for i in range(len(position)):
-            if position[i] < 0:
+    def __handle_walls(self) -> None:
+        for i in range(len(self.position_vector)):
+            if self.position_vector[i] < 0:
                 self.position_vector[i] = 0 + Particle.epsilon
                 self.velocity_vector[i] *= -1.0
-            elif position[i] > screen.screen_max[i]:
-                self.position_vector[i] = screen.screen_max[i] - Particle.epsilon
+            elif self.position_vector[i] > self.screen.screen_max[i]:
+                self.position_vector[i] = self.screen.screen_max[i] - Particle.epsilon
                 self.velocity_vector[i] *= -1.0
-            else:
-                self.position_vector[i] = position[i]
 
-    def __handle_max_velocity(self, velocity: np.ndarray) -> None:
-        velocity_tmp = velocity
+    def __handle_max_velocity(self) -> None:
+        for i in range(len(self.velocity_vector)):
+            if self.velocity_vector[i] >= Particle.max_velocity:
+                self.velocity_vector[i] = Particle.max_velocity
+            elif self.velocity_vector[i] <= -Particle.max_velocity:
+                self.velocity_vector[i] = -Particle.max_velocity
 
-        for i in range(len(velocity)):
-            if velocity[i] >= Particle.max_velocity:
-                velocity_tmp[i] = Particle.max_velocity
-            elif velocity[i] <= -Particle.max_velocity:
-                velocity_tmp[i] = -Particle.max_velocity
+    def __eulers_method_position(self) -> None:
+        self.position_vector = self.position_vector + self.velocity_vector * self.time_delta
+        self.__handle_walls()
 
-        self.velocity_vector = velocity_tmp
+    def __eulers_method_velocity(self) -> None:
+        self.velocity_vector = self.velocity_vector + self.force_vector * self.time_delta
+        self.__handle_max_velocity()
 
-    def draw(self, screen: 'Screen') -> None:
+    def __leapfrog_position(self) -> None:
+        pass
+
+    def __leapfrog_velocity(self) -> None:
+        pass
+
+    def draw(self) -> None:
         position_tuple = (self.position_vector[0], self.position_vector[1])
-        pygame.draw.circle(screen.screen, self.color, position_tuple, Particle.radius)
+        pygame.draw.circle(self.screen.surface, self.color, position_tuple, Particle.radius)
  
         if self.draw_force_vector:
             ndarray_end_position = self.position_vector + self.force_vector
             end_position = (ndarray_end_position[0], ndarray_end_position[1])
-            pygame.draw.line(screen.screen, self.color, position_tuple, end_position)
+            pygame.draw.line(self.screen.surface, self.color, position_tuple, end_position)
 
-    def calculate_position(
-            self,
-            time_delta: float,
-            screen: 'Screen',
-            particles: list['Particle'],
-            ) -> None:
+    def calculate_position(self, particles: list['Particle']) -> None:
+        self.__calculate_velocity(particles)
+        self.__eulers_method_position()
 
-        self.__calculate_velocity(time_delta, particles)
-        position = self.position_vector + self.velocity_vector * time_delta
-        self.__handle_walls(position, screen)
-
-    def __calculate_velocity(self, time_delta: float, particles: list['Particle']) -> None:
+    def __calculate_velocity(self, particles: list['Particle']) -> None:
         self.__calculate_total_force(particles)
-        velocity = self.velocity_vector + self.force_vector * time_delta
-        self.__handle_max_velocity(velocity)
+        self.__eulers_method_velocity()
  
     def __calculate_total_force(self, particles: list['Particle']) -> None:
         force = np.array([0, 0])
@@ -123,7 +129,6 @@ class Particle:
     def __calculate_force(self, other_particle: 'Particle') -> np.ndarray:
         force_constant = -1000000.0
         position_delta = self.position_vector - other_particle.position_vector
-
         r = self.__magnitude(position_delta)
         unit_vector = np.array([position_delta[0] / r, position_delta[1] / r])
         return unit_vector * (force_constant / r**2)
@@ -131,23 +136,22 @@ class Particle:
 
 def main():
     screen = Screen()    
-
+    time_delta = 0.016
+ 
     particles = [
-        Particle(np.array([400.0, 400.0]), np.array([0.0, 0.0]), True, "Upper"),
-        Particle(np.array([600.0, 400.0]), np.array([0.0, 0.0]), True, "Lower"),
-        ]
+        Particle(screen, np.array([400.0, 400.0]), np.array([0.0, 0.0]), time_delta, True, "Upper"),
+        Particle(screen, np.array([600.0, 400.0]), np.array([0.0, 0.0]), time_delta, True, "Lower"),
+    ]
 
     running = True
     while running:
         screen.fill()
-        screen.screen.blit(screen.update_fps(), (10,0))
-
-        time_delta = screen.get_time() / 1000
+        screen.surface.blit(screen.update_fps(), (10,0))
 
         for i in range(len(particles)):
             sublist = particles[:i] + particles[i + 1:]
-            particles[i].calculate_position(time_delta, screen, sublist)
-            particles[i].draw(screen)
+            particles[i].calculate_position(sublist)
+            particles[i].draw()
 
         pygame.display.flip()
         screen.clock.tick(60)
