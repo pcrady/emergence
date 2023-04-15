@@ -11,7 +11,7 @@ class Color(Enum):
 
 
 class NumericalMethod(Enum):
-    euloer = 1
+    euler = 1
     leapfrog = 2
 
 
@@ -50,15 +50,19 @@ class Particle:
             position_vector: np.ndarray,
             velocity_vector: np.ndarray,
             time_delta: float,
+            method: NumericalMethod = NumericalMethod.euler,
             draw_force_vector: bool = True,
             label: str = "",
         ) -> None:
 
+        self.screen: Screen = screen
         self.position_vector: np.ndarray = position_vector
         self.velocity_vector: np.ndarray = velocity_vector
         self.force_vector: np.ndarray = np.array([0, 0])
+        self.previous_force_vector: np.ndarray = np.array([0, 0])
+
         self.time_delta: float = time_delta
-        self.screen: Screen = screen
+        self.method: NumericalMethod = method
 
         self.color: str = self.__random_color()
         self.draw_force_vector: bool = draw_force_vector
@@ -98,10 +102,12 @@ class Particle:
         self.__handle_max_velocity()
 
     def __leapfrog_position(self) -> None:
-        pass
+        self.position_vector = self.position_vector + (self.velocity_vector * self.time_delta) + (0.5 * self.force_vector * self.time_delta**2)
+        self.__handle_walls()
 
     def __leapfrog_velocity(self) -> None:
-        pass
+        self.velocity_vector = self.velocity_vector + 0.5 * (self.previous_force_vector + self.force_vector) * self.time_delta
+        self.__handle_max_velocity()
 
     def draw(self) -> None:
         position_tuple = (self.position_vector[0], self.position_vector[1])
@@ -114,17 +120,25 @@ class Particle:
 
     def calculate_position(self, particles: list['Particle']) -> None:
         self.__calculate_velocity(particles)
-        self.__eulers_method_position()
+
+        if self.method == NumericalMethod.euler:
+            self.__eulers_method_position()
+        if self.method == NumericalMethod.leapfrog:
+            self.__leapfrog_position()
 
     def __calculate_velocity(self, particles: list['Particle']) -> None:
+        self.previous_force_vector = self.force_vector
         self.__calculate_total_force(particles)
-        self.__eulers_method_velocity()
+
+        if self.method == NumericalMethod.euler:
+            self.__eulers_method_velocity()
+        if self.method == NumericalMethod.leapfrog:
+            self.__leapfrog_velocity()
  
     def __calculate_total_force(self, particles: list['Particle']) -> None:
-        force = np.array([0, 0])
+        self.force_vector = np.array([0, 0])
         for particle in particles:
-            force = force + self.__calculate_force(particle)
-        self.force_vector = force
+            self.force_vector = self.force_vector + self.__calculate_force(particle)
             
     def __calculate_force(self, other_particle: 'Particle') -> np.ndarray:
         force_constant = -1000000.0
@@ -137,10 +151,11 @@ class Particle:
 def main():
     screen = Screen()    
     time_delta = 0.016
+    method = NumericalMethod.leapfrog
  
     particles = [
-        Particle(screen, np.array([400.0, 400.0]), np.array([0.0, 0.0]), time_delta, True, "Upper"),
-        Particle(screen, np.array([600.0, 400.0]), np.array([0.0, 0.0]), time_delta, True, "Lower"),
+        Particle(screen, np.array([400.0, 400.0]), np.array([0.0, 0.0]), time_delta, draw_force_vector = True, method=method),
+        Particle(screen, np.array([600.0, 400.0]), np.array([0.0, 0.0]), time_delta, draw_force_vector = True, method=method),
     ]
 
     running = True
