@@ -13,6 +13,7 @@ class Color(Enum):
 class NumericalMethod(Enum):
     euler = 1
     leapfrog = 2
+    runge_kutta = 3
 
 
 class Screen:
@@ -75,7 +76,7 @@ class Particle:
     @staticmethod
     def __magnitude(vector: np.ndarray) -> float:
         r = sum(i ** 2 for i in vector) ** 0.5
-        return r if r >= Particle.epsilon else Particle.epsilon
+        return r # if r >= Particle.epsilon else Particle.epsilon
 
     def __handle_walls(self) -> None:
         for i in range(len(self.position_vector)):
@@ -114,43 +115,46 @@ class Particle:
         pygame.draw.circle(self.screen.surface, self.color, position_tuple, Particle.radius)
  
         if self.draw_force_vector:
-            ndarray_end_position = self.position_vector + self.force_vector
+            size_multiplier = 3
+            ndarray_end_position = self.position_vector + (self.force_vector) * size_multiplier
             end_position = (ndarray_end_position[0], ndarray_end_position[1])
             pygame.draw.line(self.screen.surface, self.color, position_tuple, end_position)
 
-    def calculate_position(self, particles: list['Particle']) -> None:
-        self.__calculate_velocity(particles)
-
+    def set_position(self) -> None:
         if self.method == NumericalMethod.euler:
             self.__eulers_method_position()
+
         if self.method == NumericalMethod.leapfrog:
             self.__leapfrog_position()
 
-    def __calculate_velocity(self, particles: list['Particle']) -> None:
-        self.previous_force_vector = self.force_vector
-        self.__calculate_total_force(particles)
-
+    def set_velocity(self) -> None:
         if self.method == NumericalMethod.euler:
             self.__eulers_method_velocity()
+
         if self.method == NumericalMethod.leapfrog:
+            self.previous_force_vector = self.force_vector
             self.__leapfrog_velocity()
+
+    def set_total_force(self, particles: list['Particle']):
+        self.force_vector = self.__calculate_total_force(particles)
  
-    def __calculate_total_force(self, particles: list['Particle']) -> None:
-        self.force_vector = np.array([0, 0])
+    def __calculate_total_force(self,  particles: list['Particle']) -> np.ndarray:
+        force_vector = np.array([0, 0])
         for particle in particles:
-            self.force_vector = self.force_vector + self.__calculate_force(particle)
+            force_vector = force_vector + self.__calculate_force(particle)
+        return force_vector
             
     def __calculate_force(self, other_particle: 'Particle') -> np.ndarray:
         force_constant = -1000000.0
         position_delta = self.position_vector - other_particle.position_vector
         r = self.__magnitude(position_delta)
         unit_vector = np.array([position_delta[0] / r, position_delta[1] / r])
-        return unit_vector * (force_constant / r**2)
+        return unit_vector * (force_constant / (r**2 + 100000.0))
 
-
+# position -> velocity -> force
 def main():
     screen = Screen()    
-    time_delta = 0.016
+    time_delta = 0.1
     method = NumericalMethod.leapfrog
  
     particles = [
@@ -165,7 +169,9 @@ def main():
 
         for i in range(len(particles)):
             sublist = particles[:i] + particles[i + 1:]
-            particles[i].calculate_position(sublist)
+            particles[i].set_position()
+            particles[i].set_velocity()
+            particles[i].set_total_force(sublist)
             particles[i].draw()
 
         pygame.display.flip()
