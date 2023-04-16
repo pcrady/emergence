@@ -18,7 +18,7 @@ class NumericalMethod(Enum):
 
 class Screen:
     screen_min: np.ndarray = np.array([0.0, 0.0])
-    screen_max: np.ndarray = np.array([1000.0, 1000.0])
+    screen_max: np.ndarray = np.array([2000.0, 2000.0])
 
     def __init__(self) -> None:
         pygame.init()
@@ -43,7 +43,7 @@ class Particle:
     radius: float = 5.0
     mass: float = 1.0
     max_velocity: float = 1000.0
-    epsilon: float = 1e-9
+    epsilon: float = 1e-3
 
     def __init__(
             self,
@@ -65,18 +65,18 @@ class Particle:
         self.time_delta: float = time_delta
         self.method: NumericalMethod = method
 
-        self.color: str = self.__random_color()
+        self.color: Color = self.__random_color()
         self.draw_force_vector: bool = draw_force_vector
         self.label: str = label
 
     @staticmethod
-    def __random_color() -> str:
-        return random.choice(list(Color.__members__))
+    def __random_color() -> Color:
+        return random.choice([Color.red, Color.green, Color.blue])
 
     @staticmethod
     def __magnitude(vector: np.ndarray) -> float:
         r = sum(i ** 2 for i in vector) ** 0.5
-        return r # if r >= Particle.epsilon else Particle.epsilon
+        return r if r >= Particle.epsilon else Particle.epsilon
 
     def __handle_walls(self) -> None:
         for i in range(len(self.position_vector)):
@@ -112,13 +112,13 @@ class Particle:
 
     def draw(self) -> None:
         position_tuple = (self.position_vector[0], self.position_vector[1])
-        pygame.draw.circle(self.screen.surface, self.color, position_tuple, Particle.radius)
+        pygame.draw.circle(self.screen.surface, self.color.value, position_tuple, Particle.radius)
  
         if self.draw_force_vector:
-            size_multiplier = 3
+            size_multiplier = 1
             ndarray_end_position = self.position_vector + (self.force_vector) * size_multiplier
             end_position = (ndarray_end_position[0], ndarray_end_position[1])
-            pygame.draw.line(self.screen.surface, self.color, position_tuple, end_position)
+            pygame.draw.line(self.screen.surface, self.color.value, position_tuple, end_position)
 
     def set_position(self) -> None:
         if self.method == NumericalMethod.euler:
@@ -145,22 +145,56 @@ class Particle:
         return force_vector
             
     def __calculate_force(self, other_particle: 'Particle') -> np.ndarray:
-        force_constant = -1000000.0
         position_delta = self.position_vector - other_particle.position_vector
         r = self.__magnitude(position_delta)
         unit_vector = np.array([position_delta[0] / r, position_delta[1] / r])
-        return unit_vector * (force_constant / (r**2 + 100000.0))
 
-# position -> velocity -> force
+        if ((self.color == Color.green) & (self.color == other_particle.color)):
+            return np.zeros(2)
+        elif ((self.color == Color.green) & (other_particle.color == Color.red)):
+            return np.zeros(2)
+        elif ((self.color == Color.green) & (other_particle.color == Color.blue)):
+            if r > 10 * Particle.radius:
+                return -unit_vector * r
+            else:
+                return unit_vector * r**4
+
+        elif ((self.color == Color.red) & (self.color == other_particle.color)):
+            return np.zeros(2)
+        elif ((self.color == Color.red) & (other_particle.color == Color.green)):
+            if r > 10 * Particle.radius:
+                return -unit_vector * r
+            else:
+                return unit_vector * r**4
+        elif ((self.color == Color.red) & (other_particle.color == Color.blue)):
+            return np.zeros(2)
+
+        elif ((self.color == Color.blue) & (self.color == other_particle.color)):
+            return np.zeros(2)
+        elif ((self.color == Color.blue) & (other_particle.color == Color.red)):
+            if r <= 15 * Particle.radius:
+                return -unit_vector * r**3
+            else: 
+                return np.zeros(2)
+        elif ((self.color == Color.blue) * (other_particle.color == Color.green)):
+            return np.zeros(2)
+        else:
+            return np.zeros(2)
+
+
 def main():
+
     screen = Screen()    
-    time_delta = 0.1
+    time_delta = 0.005
     method = NumericalMethod.leapfrog
- 
-    particles = [
-        Particle(screen, np.array([400.0, 400.0]), np.array([0.0, 0.0]), time_delta, draw_force_vector = True, method=method),
-        Particle(screen, np.array([600.0, 400.0]), np.array([0.0, 0.0]), time_delta, draw_force_vector = True, method=method),
-    ]
+    num_particles = 100
+    particles = [Particle(
+        screen,
+        np.random.rand(1, 2)[0] * screen.screen_max,
+        (np.random.rand(1, 2)[0] * 500) - 250,
+        time_delta,
+        draw_force_vector = False,
+        method = method) for _ in range(num_particles)]
 
     running = True
     while running:
