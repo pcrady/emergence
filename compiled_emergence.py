@@ -4,7 +4,7 @@ import pygame
 import random
 from enum import Enum
 import numpy as np
-from numba import jit, typed, int32, float32
+from numba import jit, njit, typed, int32, float32, prange
 from numba.experimental import jitclass
 
 
@@ -48,17 +48,14 @@ spec = [
         ('velocity_vector', float32[:]),
         ('force_vector', float32[:]),
         ('previous_force_vector', float32[:]),
-        
         ('time_delta', float32),
         ('method', int32),
         ('color', int32),
-
         ('radius', float32),
         ('color', int32),
         ('max_velocity', float32),
         ('epsilon', float32),
     ]
-
 
 @jitclass(spec)
 class Particle(object):
@@ -77,15 +74,12 @@ class Particle(object):
         self.velocity_vector: np.ndarray = velocity_vector
         self.force_vector: np.ndarray = np.array([0, 0], dtype=np.float32)
         self.previous_force_vector: np.ndarray = np.array([0, 0], dtype=np.float32)
-
         self.time_delta: float = time_delta
         self.method: int = method
         self.color: int = color
-
         self.radius: float = 1.0
         self.max_velocity: float = 1000.0
         self.epsilon: float = 1e-7
-
 
     def __magnitude(self, vector: np.ndarray) -> np.float32:
         return np.float32(0.1 * (vector[0]**2 + vector[1]**2) ** 0.5 + self.epsilon)
@@ -147,6 +141,7 @@ class Particle(object):
         r = self.__magnitude(position_delta)
         unit_vector = np.array([position_delta[0] / r, position_delta[1] / r])
 
+        # red
         if ((self.color == 0) & (self.color == other_particle.color)):
             return np.zeros(2, dtype=np.float32)
         elif ((self.color == 0) & (other_particle.color == 1)):
@@ -157,7 +152,7 @@ class Particle(object):
         elif ((self.color == 0) & (other_particle.color == 2)):
             return np.zeros(2, dtype=np.float32)
 
-
+        # green
         elif ((self.color == 1) & (self.color == other_particle.color)):
             return np.zeros(2, dtype=np.float32)
         elif ((self.color == 1) & (other_particle.color == 0)):
@@ -167,8 +162,8 @@ class Particle(object):
                 return -unit_vector * r
             else:
                 return unit_vector * r**4
-
-
+        
+        # blue
         elif ((self.color == 2) & (self.color == other_particle.color)):
             return np.zeros(2, dtype=np.float32)
         elif ((self.color == 2) & (other_particle.color == 0)):
@@ -196,14 +191,12 @@ def draw_particles(particles: list[Particle], screen: Screen) -> None:
     for particle in particles:
         draw(particle.position_vector, particle.color, screen, particle.radius)
 
-
-@jit
+@njit(fastmath=True, parallel=True)
 def perform_computations(particles: list[Particle]) -> None:
-    for i in range(len(particles)):
+    for i in prange(len(particles)):
         particles[i].set_position()
         particles[i].set_velocity()
         particles[i].set_total_force(typed.List(particles))
-
 
 def main():
     screen = Screen()    
