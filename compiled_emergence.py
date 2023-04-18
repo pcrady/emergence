@@ -1,10 +1,9 @@
 #!/usr/bin/env python3.10
-
 import pygame
 import random
 from enum import Enum
 import numpy as np
-from numba import jit, njit, typed, int32, float32, prange
+from numba import njit, typed, int32, float32, prange
 from numba.experimental import jitclass
 
 
@@ -140,39 +139,39 @@ class Particle(object):
         position_delta = self.position_vector - other_particle.position_vector
         r = self.__magnitude(position_delta)
         unit_vector = np.array([position_delta[0] / r, position_delta[1] / r])
-
         # red
-        if ((self.color == 0) & (self.color == other_particle.color)):
-            return np.zeros(2, dtype=np.float32)
-        elif ((self.color == 0) & (other_particle.color == 1)):
-            if r > 10 * self.radius:
-                return -unit_vector * r
-            else:
-                return unit_vector * r**4
-        elif ((self.color == 0) & (other_particle.color == 2)):
-            return np.zeros(2, dtype=np.float32)
-
-        # green
-        elif ((self.color == 1) & (self.color == other_particle.color)):
-            return np.zeros(2, dtype=np.float32)
-        elif ((self.color == 1) & (other_particle.color == 0)):
-            return np.zeros(2, dtype=np.float32)
-        elif ((self.color == 1) & (other_particle.color == 2)):
-            if r > 10 * self.radius:
-                return -unit_vector * r
-            else:
-                return unit_vector * r**4
-        
-        # blue
-        elif ((self.color == 2) & (self.color == other_particle.color)):
-            return np.zeros(2, dtype=np.float32)
-        elif ((self.color == 2) & (other_particle.color == 0)):
-            if r <= 15 * self.radius:
-                return -unit_vector * r**3
-            else: 
+        if (self.color == 0):
+            if (other_particle.color == 0):
                 return np.zeros(2, dtype=np.float32)
-        elif ((self.color == 2) * (other_particle.color == 1)):
-            return np.zeros(2, dtype=np.float32)
+            elif (other_particle.color == 1):
+                if r > 10 * self.radius:
+                    return -unit_vector * r
+                else:
+                    return unit_vector * r**2
+            else:
+                return np.zeros(2, dtype=np.float32)
+        # green
+        if (self.color == 1):
+            if (other_particle.color == 0):
+                return np.zeros(2, dtype=np.float32)
+            elif (other_particle.color == 1):
+                return np.zeros(2, dtype=np.float32)
+            else:
+                if r > 10 * self.radius:
+                    return -unit_vector * r
+                else:
+                    return unit_vector * r**4
+        # blue
+        if (self.color == 2):
+            if (other_particle.color == 2):
+                return np.zeros(2, dtype=np.float32)
+            elif (other_particle.color == 1):
+                if r > 10 * self.radius:
+                    return -unit_vector * r
+                else:
+                    return unit_vector * r**3
+            else:
+                return np.zeros(2, dtype=np.float32)
 
         return np.zeros(2, dtype=np.float32)
 
