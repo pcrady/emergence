@@ -20,7 +20,7 @@ class NumericalMethod(Enum):
 
 class Screen:
     screen_min: np.ndarray = np.array([0.0, 0.0])
-    screen_max: np.ndarray = np.array([2000.0, 2000.0])
+    screen_max: np.ndarray = np.array([1000.0, 1000.0])
 
     def __init__(self) -> None:
         pygame.init()
@@ -42,7 +42,7 @@ class Screen:
 
 
 class Particle:
-    radius: float = 5.0
+    radius: float = 1.0
     mass: float = 1.0
     max_velocity: float = 1000.0
     epsilon: float = 1e-3

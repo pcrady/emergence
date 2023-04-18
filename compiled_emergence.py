@@ -21,7 +21,7 @@ class NumericalMethod(Enum):
 
 class Screen:
     screen_min: np.ndarray = np.array([0.0, 0.0], dtype=np.float32)
-    screen_max: np.ndarray = np.array([2000.0, 2000.0], dtype=np.float32)
+    screen_max: np.ndarray = np.array([1000.0, 1000.0], dtype=np.float32)
 
     def __init__(self) -> None:
         pygame.init()
@@ -82,13 +82,13 @@ class Particle(object):
         self.method: int = method
         self.color: int = color
 
-        self.radius: float = 5.0
+        self.radius: float = 1.0
         self.max_velocity: float = 1000.0
         self.epsilon: float = 1e-7
 
 
     def __magnitude(self, vector: np.ndarray) -> np.float32:
-        return np.float32((vector[0]**2 + vector[1]**2) ** 0.5 + self.epsilon)
+        return np.float32(0.1 * (vector[0]**2 + vector[1]**2) ** 0.5 + self.epsilon)
 
     def __handle_walls(self) -> None:
         for i in range(len(self.position_vector)):
@@ -178,8 +178,8 @@ class Particle(object):
                 return np.zeros(2, dtype=np.float32)
         elif ((self.color == 2) * (other_particle.color == 1)):
             return np.zeros(2, dtype=np.float32)
-        else:
-            return np.zeros(2, dtype=np.float32)
+
+        return np.zeros(2, dtype=np.float32)
 
 
 def draw(position_vector: np.ndarray, color: int, screen: Screen, radius) -> None:
@@ -191,7 +191,6 @@ def draw(position_vector: np.ndarray, color: int, screen: Screen, radius) -> Non
     else:
         value = Color.blue
     pygame.draw.circle(screen.surface, value.value, position_tuple, radius)
-
 
 def draw_particles(particles: list[Particle], screen: Screen) -> None:
     for particle in particles:
@@ -229,7 +228,7 @@ def main():
         draw_particles(particles, screen)
 
         pygame.display.flip()
-        screen.clock.tick(120)
+        screen.clock.tick(60)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
