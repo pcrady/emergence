@@ -11,6 +11,7 @@ class Color(Enum):
     red = (255, 0, 0)
     green = (0, 255, 0)
     blue = (0, 0, 255)
+    magenta = (255, 0, 255)
 
 class NumericalMethod(Enum):
     euler = 0
@@ -20,7 +21,7 @@ class NumericalMethod(Enum):
 
 class Screen:
     screen_min: np.ndarray = np.array([0.0, 0.0], dtype=np.float32)
-    screen_max: np.ndarray = np.array([1000.0, 1000.0], dtype=np.float32)
+    screen_max: np.ndarray = np.array([2000.0, 2000.0], dtype=np.float32)
 
     def __init__(self) -> None:
         pygame.init()
@@ -49,7 +50,6 @@ spec = [
         ('previous_force_vector', float32[:]),
         ('time_delta', float32),
         ('method', int32),
-        ('color', int32),
         ('radius', float32),
         ('color', int32),
         ('max_velocity', float32),
@@ -76,7 +76,7 @@ class Particle(object):
         self.time_delta: float = time_delta
         self.method: int = method
         self.color: int = color
-        self.radius: float = 1.0
+        self.radius: float = 2.0
         self.max_velocity: float = 1000.0
         self.epsilon: float = 1e-7
 
@@ -144,25 +144,40 @@ class Particle(object):
             if (other_particle.color == 0):
                 return np.zeros(2, dtype=np.float32)
             elif (other_particle.color == 1):
-                if r > 10 * self.radius:
+                if r > 5 * self.radius:
                     return -unit_vector * r
                 else:
                     return unit_vector * r**2
-            else:
-                return np.zeros(2, dtype=np.float32)
+            elif (other_particle.color == 2):
+                return unit_vector**2
         # green
         if (self.color == 1):
             if (other_particle.color == 0):
                 return np.zeros(2, dtype=np.float32)
             elif (other_particle.color == 1):
                 return np.zeros(2, dtype=np.float32)
+            elif (other_particle.color == 2):
+                return np.zeros(2, dtype=np.float32)
             else:
                 if r > 10 * self.radius:
                     return -unit_vector * r
                 else:
-                    return unit_vector * r**4
+                    return -unit_vector * r**3
         # blue
         if (self.color == 2):
+            if (other_particle.color == 0):
+                return np.zeros(2, dtype=np.float32)
+            elif (other_particle.color == 1):
+                if r > 5 * self.radius:
+                    return -unit_vector * r
+                else:
+                    return unit_vector * r**3
+            elif (other_particle.color == 2):
+                return np.zeros(2, dtype=np.float32)
+            else:
+                return -unit_vector * r
+        # magenta
+        if (self.color == 3):
             if (other_particle.color == 2):
                 return np.zeros(2, dtype=np.float32)
             elif (other_particle.color == 1):
@@ -172,7 +187,7 @@ class Particle(object):
                     return unit_vector * r**3
             else:
                 return np.zeros(2, dtype=np.float32)
-
+ 
         return np.zeros(2, dtype=np.float32)
 
 
@@ -182,8 +197,11 @@ def draw(position_vector: np.ndarray, color: int, screen: Screen, radius) -> Non
         value = Color.red
     elif (color == 1):
         value = Color.green
-    else:
+    elif (color == 2):
         value = Color.blue
+    else:
+        value = Color.magenta
+
     pygame.draw.circle(screen.surface, value.value, position_tuple, radius)
 
 def draw_particles(particles: list[Particle], screen: Screen) -> None:
@@ -207,7 +225,7 @@ def main():
         screen_max = screen.screen_max,
         position_vector = (np.random.rand(1, 2)[0] * screen.screen_max).astype(np.float32),
         velocity_vector = ((np.random.rand(1, 2)[0] * 500) - 250).astype(np.float32),
-        color = random.choice([0, 1, 2]),
+        color = random.choice([0, 1, 2, 3]),
         time_delta = time_delta,
         method = method.value) for _ in range(num_particles)]
 
