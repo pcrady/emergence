@@ -20,7 +20,7 @@ class NumericalMethod(Enum):
 
 class Screen:
     screen_min: np.ndarray = np.array([0.0, 0.0], dtype=np.float32)
-    screen_max: np.ndarray = np.array([1200.0, 1000.0], dtype=np.float32)
+    screen_max: np.ndarray = np.array([2500.0, 2000.0], dtype=np.float32)
 
     def __init__(self) -> None:
         pygame.init()
@@ -181,7 +181,7 @@ class Particle(object):
                 if r > 10 * self.radius:
                     return -unit_vector * r * self.mult
                 else:
-                    return -unit_vector * r**3 * self.mult
+                    return unit_vector * r**3 * self.mult
         # blue
         if (self.color == 2):
             if (other_particle.color == 0):
@@ -213,7 +213,6 @@ class Particle(object):
 def draw(position_vector: np.ndarray, color: int, screen: Screen, radius) -> None:
     position_tuple = (float(position_vector[0]), float(position_vector[1]))
     end_tuple = (float(position_vector[0]), float(position_vector[1] - 1.0))
-
     if (color == 0):
         colorValue = Color.red
     elif (color == 1):
@@ -222,12 +221,13 @@ def draw(position_vector: np.ndarray, color: int, screen: Screen, radius) -> Non
         colorValue = Color.blue
     else:
         colorValue = Color.magenta
-
     pygame.draw.line(screen.surface, colorValue.value, position_tuple, end_tuple, int(radius))
+
 
 def draw_particles(particles: list[Particle], screen: Screen) -> None:
     for particle in particles:
         draw(particle.position_vector, particle.color, screen, particle.radius)
+
 
 @njit(fastmath=True, parallel=True)
 def perform_computations(particles: list[Particle]) -> None:
@@ -235,6 +235,7 @@ def perform_computations(particles: list[Particle]) -> None:
         particles[i].set_position()
         particles[i].set_velocity()
         particles[i].set_total_force(typed.List(particles))
+
 
 def main():
     screen = Screen()    
